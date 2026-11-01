@@ -2,7 +2,7 @@
 /* ====== QUẢN LÝ TIỀN – dữ liệu lưu trong máy (localStorage) ====== */
 const $ = s => document.querySelector(s), K = 'qlt_v1';
 const DEF = {
-  init: false, b0: 0, tx: [], budget: 0, hide: false,
+  init: false, b0: 0, tx: [], budget: 0, hide: false, lastCat: {out:'', in:''},
   cats: [['🍜','Ăn uống'],['🛵','Di chuyển'],['🛍️','Mua sắm'],['🧾','Hóa đơn'],['🎮','Giải trí'],['💊','Sức khỏe'],['📦','Khác'],['💰','Thu nhập']],
   quick: [
     {id:1,t:'out',n:'Cà phê',a:25000,e:'☕',c:'#e17055',k:'Ăn uống'},
@@ -28,6 +28,10 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => '&#' + c.ch
 const dkey = ts => { const d = new Date(ts); return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate(); };
 const mkey = ts => { const d = new Date(ts); return d.getFullYear() * 12 + d.getMonth(); };
 const tm = ts => new Date(ts).toLocaleTimeString('vi-VN', {hour:'2-digit', minute:'2-digit'});
+const defCat = t => { // danh mục mặc định = danh mục lần gần nhất đã chọn
+  const l = (S.lastCat || {})[t];
+  return S.cats.some(c => c[1] === l) ? l : (t === 'in' && S.cats.some(c => c[1] === 'Thu nhập') ? 'Thu nhập' : S.cats[0][1]);
+};
 const ce = c => (S.cats.find(x => x[1] === c) || ['📦'])[0];
 const vib = () => S.set.vib && navigator.vibrate && navigator.vibrate(15);
 
@@ -98,7 +102,7 @@ function qp(id) {                                   // bấm nút trừ/cộng n
 const sh = h => { $('#sheet').innerHTML = `<div class="bd" onclick="cl()"></div><div class="card sheet">${h}</div>`; $('#sheet').className = 'open'; };
 const cl = () => { $('#sheet').className = ''; };
 function txSheet(t) {
-  const e = !!t.id; t = Object.assign({type:'out', amt:0, cat:S.cats[0][1], note:'', ts:Date.now()}, t); _ty = t.type;
+  const e = !!t.id; t = Object.assign({type:'out', amt:0, note:'', ts:Date.now()}, t); if (!t.cat) t.cat = defCat(t.type); _ty = t.type;
   const d = new Date(t.ts - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
   sh(`<h3>${e ? 'Sửa giao dịch' : 'Thêm giao dịch'}</h3>
   <div class="seg"><button id="s-out" class="${t.type === 'out' ? 'on' : ''}" onclick="stype('out')">Chi</button><button id="s-in" class="${t.type === 'in' ? 'on' : ''}" onclick="stype('in')">Thu</button></div>
@@ -107,10 +111,11 @@ function txSheet(t) {
   <input id="f-n" placeholder="Ghi chú" value="${esc(t.note)}"><input id="f-d" type="datetime-local" value="${d}">
   <button class="btn" onclick="saveTx('${t.id || ''}')">Lưu</button>${e ? `<button class="btn red" onclick="delTx('${t.id}')">Xóa giao dịch</button>` : ''}`);
 }
-function stype(t) { _ty = t; $('#s-out').className = t === 'out' ? 'on' : ''; $('#s-in').className = t === 'in' ? 'on' : ''; if (t === 'in') $('#f-c').value = 'Thu nhập'; }
+function stype(t) { _ty = t; $('#s-out').className = t === 'out' ? 'on' : ''; $('#s-in').className = t === 'in' ? 'on' : ''; $('#f-c').value = defCat(t); }
 function saveTx(id) {
   const a = num($('#f-a').value); if (!a) return toast('Nhập số tiền lớn hơn 0');
   const o = {type:_ty, amt:a, cat:$('#f-c').value, note:$('#f-n').value.trim(), ts:new Date($('#f-d').value).getTime() || Date.now()};
+  (S.lastCat = S.lastCat || {})[o.type] = o.cat;
   if (id) { Object.assign(S.tx.find(x => x.id === id), o); save(); cl(); render(); } else { cl(); addTx(o); }
 }
 const editTx = id => txSheet(S.tx.find(x => x.id === id));
@@ -142,20 +147,18 @@ function qMove(id, d) {
   [S.quick[i], S.quick[j]] = [S.quick[j], S.quick[i]]; save(); render();
 }
 const tile = q => `<div class="tile" style="--c:${q.c}" onclick="qp(${q.id})"><span>${esc(q.e)}</span><b>${esc(q.n)}</b><small>${q.t === 'in' ? '+' : '-'}${fmt(q.a)}</small>${edit ? `<i class="mv l" onclick="event.stopPropagation();qMove(${q.id},-1)">${ic('chl')}</i><i class="mv r" onclick="event.stopPropagation();qMove(${q.id},1)">${ic('chr')}</i>` : ''}</div>`;
-const grid = (t, l) => `<div class="grid">${S.quick.filter(q => q.t === t).slice(0, l || 99).map(tile).join('')}${t === 'out' ? `<div class="tile dash" onclick="txSheet({type:'out'})"><span>${ic('plus')}</span><b>Khác…</b><small>Số tiền tùy ý</small></div>` : ''}</div>`;
+const grid = (t, l) => `<div class="grid">${S.quick.filter(q => q.t === t).slice(0, l || 99).map(tile).join('')}</div>`;
 const row = t => `<div class="row" onclick="editTx('${t.id}')"><span class="ic">${esc(t.e || ce(t.cat))}</span><div class="mid"><b>${esc(t.name || t.cat)}</b><small>${esc(t.cat)} · ${tm(t.ts)}${t.note ? ' · ' + esc(t.note) : ''}</small></div><b class="${t.type}">${t.type === 'in' ? '+' : '-'}${fmt(t.amt)}</b></div>`;
 
 /* ====== Các màn hình ====== */
 function vHome() {
   const m = mstat(), b = S.budget, raw = b ? m.o / b * 100 : 0, p = Math.min(raw, 100);
-  const rec = [...S.tx].sort((a, b) => b.ts - a.ts).slice(0, 5).map(row).join('');
-  return `<header><div><h1>Xin chào</h1><small>${new Date().toLocaleDateString('vi-VN', {weekday:'long', day:'numeric', month:'long'})}</small></div></header>
+  return `<header><h1>${new Date().toLocaleDateString('vi-VN', {weekday:'long', day:'numeric', month:'long'})}</h1></header>
   <div class="hero"><small>Tổng tiền hiện tại</small><div class="amt" id="bal">${S.hide ? '••••••' : fmt(bal())}</div>
   <button class="eye" onclick="S.hide=!S.hide;save();render()">${ic(S.hide ? 'eye' : 'eyeoff')}</button>
   <div class="two"><div><small>Thu tháng này</small><b>+${fmt(m.i)}</b></div><div><small>Chi tháng này</small><b>-${fmt(m.o)}</b></div></div></div>
   ${b ? `<div class="card"><div class="bh"><b>Ngân sách tháng</b><span>${fmt(m.o)} / ${fmt(b)}</span></div><div class="bar"><i class="${raw >= 100 ? 'r' : raw >= 80 ? 'o' : ''}" style="width:${p}%"></i></div>${raw >= 100 ? '<small class="red">' + ic('warn') + ' Đã vượt ngân sách tháng!</small>' : raw >= 80 ? `<small>${ic('warn')} Đã dùng ${Math.round(raw)}% ngân sách</small>` : ''}</div>` : ''}
-  <div class="sec"><b class="st">${ic('bolt')} Trừ nhanh</b><a onclick="go('quick')">Xem tất cả</a></div>${grid('out', 5)}
-  <div class="sec"><b>Gần đây</b><a onclick="go('hist')">Tất cả</a></div><div class="card list">${rec || '<p class="empty">Chưa có giao dịch</p>'}</div>`;
+  <div class="sec"><b class="st">${ic('bolt')} Trừ nhanh</b><a onclick="go('quick')">Xem tất cả</a></div>${grid('out', 6)}`;
 }
 function vQuick() {
   return `<header><h1>Trừ tiền nhanh</h1><button class="chip ${edit ? 'on' : ''}" onclick="edit=!edit;render()">${edit ? 'Xong' : ic('edit') + ' Sửa'}</button></header>

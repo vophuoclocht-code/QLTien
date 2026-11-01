@@ -63,7 +63,7 @@ input[type=checkbox]{width:24px;height:24px;accent-color:var(--pr)}
 .bars div{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px}
 .bars i{width:100%;min-height:3px;border-radius:8px;background:linear-gradient(#34d399,#0d9488)}
 #nav{position:fixed;left:0;right:0;bottom:0;display:flex;padding:6px 6px calc(6px + env(safe-area-inset-bottom));background:color-mix(in srgb,var(--card) 82%,transparent);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--bd);z-index:5}
-#nav button{flex:1;min-height:48px;border:0;background:none;color:var(--mu);font:600 11px inherit}
+#nav button{flex:1;min-width:0;min-height:48px;padding:0;white-space:nowrap;border:0;background:none;color:var(--mu);font:600 11px inherit}
 #nav button.on{color:var(--pr)}
 #fab{position:fixed;right:18px;bottom:calc(84px + env(safe-area-inset-bottom));width:58px;height:58px;border-radius:50%;border:0;color:#fff;font-size:0;display:grid;place-items:center;background:linear-gradient(135deg,#065f55,#0d9488 70%,#34d399);box-shadow:0 10px 24px rgba(13,148,136,.45);z-index:6}
 #sheet:not(.open){display:none}
@@ -84,7 +84,7 @@ input[type=checkbox]{width:24px;height:24px;accent-color:var(--pr)}
 /* ===== Icon SVG 1 màu 2 tông ===== */
 .ico{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.15em;flex:none}
 .ico .f{fill:currentColor;fill-opacity:.2;stroke:none}
-.ni{display:grid;place-items:center;width:56px;height:32px;border-radius:16px;margin:0 auto 2px;font-size:24px;transition:background .2s}
+.ni{display:grid;place-items:center;width:52px;height:32px;border-radius:16px;margin:0 auto 2px;font-size:24px;transition:background .2s}
 #nav button.on .ni{background:color-mix(in srgb,var(--pr) 16%,transparent)}
 #nav button.on .ico .f{fill-opacity:.4}
 .lb{display:flex;align-items:center;gap:12px}
