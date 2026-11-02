@@ -66,6 +66,7 @@ const ICONS = {
  edit:'<path class="f" d="m4 20 1-4L16 5l3 3L8 19z"/><path d="m4 20 1-4L16 5l3 3L8 19zM14 7l3 3"/>',
  coin:'<circle class="f" cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="9"/><path d="M12 6.8v10.4M9.6 9.4c0-1 1.1-1.7 2.4-1.7s2.4.7 2.4 1.7-1 1.5-2.4 1.8-2.4.8-2.4 1.8 1.1 1.7 2.4 1.7 2.4-.7 2.4-1.7"/>',
  wifioff:'<path d="M2.5 9a14 14 0 0 1 19 0M5.6 12.6a9.5 9.5 0 0 1 12.8 0M8.9 16a5 5 0 0 1 6.2 0"/><path class="f" d="M3 3l18 18" /><path d="M3.5 3.5l17 17"/><circle cx="12" cy="19.3" r="1" fill="currentColor"/>',
+ undo:'<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
  back:'<path class="f" d="M9 5h10a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H9l-6-7z"/><path d="M9 5h10a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H9l-6-7zM12.5 9.5l4 5M16.5 9.5l-4 5"/>'
 };
 const ic = n => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`;
@@ -84,11 +85,18 @@ function mstat(off = 0) {
 
 /* ====== Toast + hoàn tác ====== */
 function toast(m, undo) {
-  const el = $('#toast');
-  el.innerHTML = `<span>${m}</span>${undo ? '<button id="un">HOÀN TÁC</button>' : ''}`;
-  el.classList.add('show');
-  if (undo) $('#un').onclick = () => { undo(); el.classList.remove('show'); };
-  clearTimeout(tt); tt = setTimeout(() => el.classList.remove('show'), 5000);
+  clearTimeout(tt); const u = $('#undo'), el = $('#toast');
+  if (undo) { // chỉ hiện 1 nút tròn "quay lại" có vòng đếm ngược 5 giây
+    el.classList.remove('show');
+    u.innerHTML = `<svg class="ring" viewBox="0 0 56 56"><circle cx="28" cy="28" r="25"/></svg>${ic('undo')}`;
+    u.classList.toggle('up', $('#fab').style.display !== 'none');
+    u.onclick = () => { undo(); u.classList.remove('show'); };
+    u.classList.remove('show'); void u.offsetWidth; u.classList.add('show');
+    tt = setTimeout(() => u.classList.remove('show'), 5000);
+  } else {    // thông báo thường (lỗi nhập, nhắc sao lưu…)
+    u.classList.remove('show'); el.innerHTML = `<span>${m}</span>`; el.classList.add('show');
+    tt = setTimeout(() => el.classList.remove('show'), 3500);
+  }
 }
 
 /* ====== Giao dịch ====== */
@@ -151,7 +159,7 @@ function qMove(id, d) {
 }
 const tile = q => `<div class="tile" style="--c:${q.c}" onclick="qp(${q.id})"><span>${esc(q.e)}</span><b>${esc(q.n)}</b><small>${q.t === 'in' ? '+' : '-'}${fmt(q.a)}</small>${edit ? `<i class="mv l" onclick="event.stopPropagation();qMove(${q.id},-1)">${ic('chl')}</i><i class="mv r" onclick="event.stopPropagation();qMove(${q.id},1)">${ic('chr')}</i>` : ''}</div>`;
 const grid = (t, l) => `<div class="grid">${S.quick.filter(q => q.t === t).slice(0, l || 99).map(tile).join('')}</div>`;
-const row = t => `<div class="row" onclick="editTx('${t.id}')"><span class="ic">${esc(t.e || ce(t.cat))}</span><div class="mid"><b>${esc(t.name || t.cat)}</b><small>${esc(t.cat)} · ${tm(t.ts)}${t.note ? ' · ' + esc(t.note) : ''}</small></div><b class="${t.type}">${t.type === 'in' ? '+' : '-'}${fmt(t.amt)}</b></div>`;
+const row = t => `<div class="row" onclick="editTx('${t.id}')"><span class="ic">${esc(t.e || ce(t.cat))}</span><div class="mid"><b class="${t.note ? 'nt' : ''}">${esc(t.note || t.cat)}</b><small>${t.note ? esc(t.cat) + ' · ' : ''}${tm(t.ts)}</small></div><b class="${t.type}">${t.type === 'in' ? '+' : '-'}${fmt(t.amt)}</b></div>`;
 
 /* ====== Các màn hình ====== */
 function vHome() {
@@ -295,5 +303,6 @@ function welcome() {
 theme(); lock(); render();
 if (!S.init) welcome();
 else if (S.tx.length && Date.now() - S.set.bk > 7 * 864e5) toast('Đã hơn 7 ngày chưa sao lưu. Vào Cài đặt để xuất file.');
+const sp = $('#splash'); if (sp) setTimeout(() => { sp.classList.add('out'); setTimeout(() => sp.remove(), 400); }, 800);
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
