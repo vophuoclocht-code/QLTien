@@ -159,7 +159,7 @@ function qMove(id, d) {
 }
 const tile = q => `<div class="tile" style="--c:${q.c}" onclick="qp(${q.id})"><span>${esc(q.e)}</span><b>${esc(q.n)}</b><small>${q.t === 'in' ? '+' : '-'}${fmt(q.a)}</small>${edit ? `<i class="mv l" onclick="event.stopPropagation();qMove(${q.id},-1)">${ic('chl')}</i><i class="mv r" onclick="event.stopPropagation();qMove(${q.id},1)">${ic('chr')}</i>` : ''}</div>`;
 const grid = (t, l) => `<div class="grid">${S.quick.filter(q => q.t === t).slice(0, l || 99).map(tile).join('')}</div>`;
-const row = t => `<div class="row" onclick="editTx('${t.id}')"><span class="ic">${esc(t.e || ce(t.cat))}</span><div class="mid"><b class="${t.note ? 'nt' : ''}">${esc(t.note || t.cat)}</b><small>${t.note ? esc(t.cat) + ' · ' : ''}${tm(t.ts)}</small></div><b class="${t.type}">${t.type === 'in' ? '+' : '-'}${fmt(t.amt)}</b></div>`;
+const row = t => `<div class="row" onclick="editTx('${t.id}')"><span class="ic">${esc(t.e || ce(t.cat))}</span><div class="mid"><b>${esc(t.cat)}</b><small>${tm(t.ts)}${t.note ? ' · <i>' + esc(t.note) + '</i>' : ''}</small></div><b class="${t.type}">${t.type === 'in' ? '+' : '-'}${fmt(t.amt)}</b></div>`;
 
 /* ====== Các màn hình ====== */
 function vHome() {
