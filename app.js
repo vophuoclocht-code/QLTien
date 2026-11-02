@@ -244,7 +244,7 @@ function vStats() {
   const mx = Math.max(1, ...days.map(d => d.v)), diff = b.o ? Math.round((a.o - b.o) / b.o * 100) : null;
   const ds = dstat(), dr = (c, l, x) => `<div class="srow"><span><i class="dot" style="background:${c}"></i>${l}</span><b>${fmt(x.s)}</b></div>`;
   const dcard = `<div class="card"><b>Nợ</b>${S.tx.some(t => t.type === 'debt') ? `<div class="seg3"><i style="flex:${ds.open.s};background:var(--debt)"></i><i style="flex:${ds.cash.s};background:var(--in)"></i><i style="flex:${ds.online.s};background:#3b82f6"></i></div>
-    ${dr('var(--debt)', 'Chưa thu' + (ds.open.n ? ' (' + ds.open.n + ' khoản)' : ''), ds.open)}${dr('var(--in)', 'Đã thu trực tiếp (đã cộng lại)', ds.cash)}${dr('#3b82f6', 'Đã thu online', ds.online)}
+    ${dr('var(--debt)', 'Chưa thu' + (ds.open.n ? ' (' + ds.open.n + ' khoản)' : ''), ds.open)}${dr('var(--in)', 'Đã thu trực tiếp', ds.cash)}${dr('#3b82f6', 'Đã thu online', ds.online)}
     <small>Cho nợ trong tháng này: ${fmt(a.db)}</small>` : '<p class="empty">Chưa có khoản nợ</p>'}</div>`;
   return `<header><h1>Thống kê</h1></header>
   <div class="card"><small>Chi tháng này</small><div class="big2">${fmt(a.o)}</div><small>Tháng trước: ${fmt(b.o)}${diff === null ? '' : ` · <b class="${diff > 0 ? 'out' : 'in'}">${diff > 0 ? '▲' : '▼'} ${Math.abs(diff)}%</b>`}</small></div>
@@ -344,6 +344,5 @@ function welcome() {
 theme(); lock(); render();
 if (!S.init) welcome();
 else if (S.tx.length && Date.now() - S.set.bk > 7 * 864e5) toast('Đã hơn 7 ngày chưa sao lưu. Vào Cài đặt để xuất file.');
-const sp = $('#splash'); if (sp) setTimeout(() => { sp.classList.add('out'); setTimeout(() => sp.remove(), 400); }, 800);
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist();

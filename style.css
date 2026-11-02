@@ -116,14 +116,6 @@ input[type=checkbox]{width:24px;height:24px;accent-color:var(--pr)}
 /* ===== Dòng giao dịch: nổi bật ghi chú ===== */
 .row .mid b{display:block;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row .mid b.nt{font-style:italic;font-weight:400;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-/* ===== Màn hình chào khi mở app (chỉ khi đã cài ra màn hình chính) ===== */
-#splash{display:none;position:fixed;inset:0;z-index:200;background:#f0f7f6;flex-direction:column;align-items:center;justify-content:center;gap:18px}
-@media (display-mode:standalone){#splash{display:flex}}
-#splash img{width:112px;height:112px;border-radius:22.5%;box-shadow:0 18px 40px rgba(6,95,85,.35);animation:pop .6s cubic-bezier(.2,1.3,.4,1) both}
-#splash b{font-size:20px;color:#0f2623;letter-spacing:.2px;animation:rise .6s .12s both}
-#splash.out{opacity:0;transition:opacity .35s;pointer-events:none}
-@keyframes pop{from{opacity:0;transform:scale(.7)}}
-@keyframes rise{from{opacity:0;transform:translateY(10px)}}
 
 /* ===== Nợ ===== */
 .debt{color:var(--debt)}.debt.done{opacity:.55}
