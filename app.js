@@ -23,7 +23,8 @@ const save = () => { localStorage[K] = JSON.stringify(S); };
 const num = v => parseInt(String(v).replace(/\D/g, '')) || 0;           // tiền luôn là số nguyên
 const fmt = n => (n < 0 ? '-' : '') + Math.abs(n).toLocaleString('vi-VN') + 'đ';
 const fa = el => { const n = num(el.value); el.value = n ? n.toLocaleString('vi-VN') : ''; };
-const bal = () => S.b0 + S.tx.reduce((a, t) => a + (t.type === 'in' ? t.amt : -t.amt), 0); // số dư = đầu kỳ + giao dịch
+const eff = t => t.type === 'in' ? t.amt : t.type === 'debt' ? (t.st === 'cash' ? 0 : -t.amt) : -t.amt; // nợ: đã thu trực tiếp = cộng lại
+const bal = () => S.b0 + S.tx.reduce((a, t) => a + eff(t), 0); // số dư = đầu kỳ + giao dịch
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';');
 const dkey = ts => { const d = new Date(ts); return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate(); };
 const mkey = ts => { const d = new Date(ts); return d.getFullYear() * 12 + d.getMonth(); };
@@ -66,6 +67,9 @@ const ICONS = {
  edit:'<path class="f" d="m4 20 1-4L16 5l3 3L8 19z"/><path d="m4 20 1-4L16 5l3 3L8 19zM14 7l3 3"/>',
  coin:'<circle class="f" cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="9"/><path d="M12 6.8v10.4M9.6 9.4c0-1 1.1-1.7 2.4-1.7s2.4.7 2.4 1.7-1 1.5-2.4 1.8-2.4.8-2.4 1.8 1.1 1.7 2.4 1.7 2.4-.7 2.4-1.7"/>',
  wifioff:'<path d="M2.5 9a14 14 0 0 1 19 0M5.6 12.6a9.5 9.5 0 0 1 12.8 0M8.9 16a5 5 0 0 1 6.2 0"/><path class="f" d="M3 3l18 18" /><path d="M3.5 3.5l17 17"/><circle cx="12" cy="19.3" r="1" fill="currentColor"/>',
+ debt:'<circle class="f" cx="9" cy="8" r="3.5"/><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6h1.5M15 15.5h6M18.5 12.5l3 3-3 3"/>',
+ check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+ globe:'<circle class="f" cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 4 5.6 4 9s-1.4 6.4-4 9c-2.6-2.6-4-5.6-4-9s1.4-6.4 4-9z"/>',
  undo:'<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
  back:'<path class="f" d="M9 5h10a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H9l-6-7z"/><path d="M9 5h10a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H9l-6-7zM12.5 9.5l4 5M16.5 9.5l-4 5"/>'
 };
@@ -78,9 +82,19 @@ function dayLabel(ts) {
   return new Date(ts).toLocaleDateString('vi-VN', {weekday:'long', day:'numeric', month:'numeric'});
 }
 function mstat(off = 0) {
-  const n = new Date(), m = n.getFullYear() * 12 + n.getMonth() - off; let i = 0, o = 0; const bc = {};
-  S.tx.forEach(t => { if (mkey(t.ts) !== m) return; if (t.type === 'in') i += t.amt; else { o += t.amt; bc[t.cat] = (bc[t.cat] || 0) + t.amt; } });
-  return {i, o, bc};
+  const n = new Date(), m = n.getFullYear() * 12 + n.getMonth() - off; let i = 0, o = 0, db = 0; const bc = {};
+  S.tx.forEach(t => {
+    if (mkey(t.ts) !== m) return;
+    if (t.type === 'in') i += t.amt;
+    else if (t.type === 'debt') db += t.amt;            // nợ KHÔNG tính vào chi tiêu / ngân sách
+    else { o += t.amt; bc[t.cat] = (bc[t.cat] || 0) + t.amt; }
+  });
+  return {i, o, bc, db};
+}
+function dstat() {
+  const r = {open:{n:0, s:0}, cash:{n:0, s:0}, online:{n:0, s:0}};
+  S.tx.forEach(t => { if (t.type !== 'debt') return; const k = r[t.st] || r.open; k.n++; k.s += t.amt; });
+  return r;
 }
 
 /* ====== Toast + hoàn tác ====== */
@@ -116,18 +130,31 @@ function txSheet(t) {
   const e = !!t.id; t = Object.assign({type:'out', amt:0, note:'', ts:Date.now()}, t); if (!t.cat) t.cat = defCat(t.type); _ty = t.type;
   const d = new Date(t.ts - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
   sh(`<h3>${e ? 'Sửa giao dịch' : 'Thêm giao dịch'}</h3>
-  <div class="seg"><button id="s-out" class="${t.type === 'out' ? 'on' : ''}" onclick="stype('out')">Chi</button><button id="s-in" class="${t.type === 'in' ? 'on' : ''}" onclick="stype('in')">Thu</button></div>
+  <div class="seg"><button id="s-out" class="${t.type === 'out' ? 'on' : ''}" onclick="stype('out')">Chi</button><button id="s-in" class="${t.type === 'in' ? 'on' : ''}" onclick="stype('in')">Thu</button><button id="s-debt" class="${t.type === 'debt' ? 'on' : ''}" onclick="stype('debt')">Nợ</button></div>
   <input id="f-a" class="big" inputmode="numeric" placeholder="0" value="${t.amt ? t.amt.toLocaleString('vi-VN') : ''}" oninput="fa(this)">
-  <select id="f-c">${S.cats.map(c => opt(c[1], c[0] + ' ' + c[1], t.cat)).join('')}</select>
-  <input id="f-n" placeholder="Ghi chú" value="${esc(t.note)}"><input id="f-d" type="datetime-local" value="${d}">
+  <select id="f-c" style="${t.type === 'debt' ? 'display:none' : ''}">${S.cats.map(c => opt(c[1], c[0] + ' ' + c[1], t.cat)).join('')}</select>
+  <input id="f-n" placeholder="${t.type === 'debt' ? 'Ai nợ? / ghi chú' : 'Ghi chú'}" value="${esc(t.note)}"><input id="f-d" type="datetime-local" value="${d}">
+  ${e && t.type === 'debt' ? `<select id="f-st">${opt('open', 'Chưa thu', t.st || 'open')}${opt('cash', 'Đã thu trực tiếp (cộng lại tiền)', t.st)}${opt('online', 'Đã thu online (không cộng)', t.st)}</select>` : ''}
   <button class="btn" onclick="saveTx('${t.id || ''}')">Lưu</button>${e ? `<button class="btn red" onclick="delTx('${t.id}')">Xóa giao dịch</button>` : ''}`);
 }
-function stype(t) { _ty = t; $('#s-out').className = t === 'out' ? 'on' : ''; $('#s-in').className = t === 'in' ? 'on' : ''; $('#f-c').value = defCat(t); }
+function stype(t) {
+  _ty = t; ['out', 'in', 'debt'].forEach(k => { $('#s-' + k).className = k === t ? 'on' : ''; });
+  const d = t === 'debt'; $('#f-c').style.display = d ? 'none' : ''; if (!d) $('#f-c').value = defCat(t);
+  $('#f-n').placeholder = d ? 'Ai nợ? / ghi chú' : 'Ghi chú';
+}
 function saveTx(id) {
   const a = num($('#f-a').value); if (!a) return toast('Nhập số tiền lớn hơn 0');
-  const o = {type:_ty, amt:a, cat:$('#f-c').value, note:$('#f-n').value.trim(), ts:new Date($('#f-d').value).getTime() || Date.now()};
-  (S.lastCat = S.lastCat || {})[o.type] = o.cat;
-  if (id) { Object.assign(S.tx.find(x => x.id === id), o); save(); cl(); render(); } else { cl(); addTx(o); }
+  const d = _ty === 'debt', o = {type:_ty, amt:a, cat:d ? 'Nợ' : $('#f-c').value, note:$('#f-n').value.trim(), ts:new Date($('#f-d').value).getTime() || Date.now()};
+  if (!d) (S.lastCat = S.lastCat || {})[o.type] = o.cat;
+  const old = id ? S.tx.find(x => x.id === id) : null, se = $('#f-st');
+  o.st = d ? ((id && se && se.value) || (old && old.st) || 'open') : undefined;                       // trạng thái khoản nợ
+  o.sd = d && o.st !== 'open' ? (old && old.st === o.st && old.sd ? old.sd : Date.now()) : undefined; // ngày thu nợ
+  if (id) { Object.assign(old, o); save(); cl(); render(); } else { cl(); addTx(o); }
+}
+function settle(id, how) { // how: 'cash' = thu trực tiếp (cộng lại tiền) | 'online' = không cộng
+  const t = S.tx.find(x => x.id === id); if (!t) return;
+  const prev = {st:t.st, sd:t.sd}; t.st = how; t.sd = Date.now(); save(); vib(); render();
+  toast('', () => { t.st = prev.st; t.sd = prev.sd; save(); render(); });
 }
 const editTx = id => txSheet(S.tx.find(x => x.id === id));
 function delTx(id) {
@@ -159,15 +186,23 @@ function qMove(id, d) {
 }
 const tile = q => `<div class="tile" style="--c:${q.c}" onclick="qp(${q.id})"><span>${esc(q.e)}</span><b>${esc(q.n)}</b><small>${q.t === 'in' ? '+' : '-'}${fmt(q.a)}</small>${edit ? `<i class="mv l" onclick="event.stopPropagation();qMove(${q.id},-1)">${ic('chl')}</i><i class="mv r" onclick="event.stopPropagation();qMove(${q.id},1)">${ic('chr')}</i>` : ''}</div>`;
 const grid = (t, l) => `<div class="grid">${S.quick.filter(q => q.t === t).slice(0, l || 99).map(tile).join('')}</div>`;
-const row = t => `<div class="row" onclick="editTx('${t.id}')"><span class="ic">${esc(t.e || ce(t.cat))}</span><div class="mid">${t.note ? `<b class="nt">${esc(t.note)}</b><small>${esc(t.cat)} · ${tm(t.ts)}</small>` : `<b>${esc(t.cat)}</b><small>${tm(t.ts)}</small>`}</div><b class="${t.type}">${t.type === 'in' ? '+' : '-'}${fmt(t.amt)}</b></div>`;
+const row = t => {
+  const d = t.type === 'debt', st = t.st || 'open';
+  const mid = t.note ? `<b class="nt">${esc(t.note)}</b><small>${esc(t.cat)} · ${tm(t.ts)}</small>` : `<b>${esc(t.cat)}</b><small>${tm(t.ts)}</small>`;
+  const sign = t.type === 'in' ? '+' : (d && st === 'cash') ? '' : '-';
+  const act = !d ? '' : st === 'open'
+    ? `<div class="da"><button onclick="event.stopPropagation();settle('${t.id}','cash')">${ic('coin')} Trực tiếp</button><button onclick="event.stopPropagation();settle('${t.id}','online')">${ic('globe')} Online</button></div>`
+    : `<div class="da"><small class="ok">${ic('check')} ${st === 'cash' ? 'Đã thu trực tiếp · đã cộng lại tiền' : 'Đã thu online · không cộng tiền'}</small></div>`;
+  return `<div class="row" onclick="editTx('${t.id}')"><span class="ic${d ? ' dbt' : ''}">${d ? ic('debt') : esc(t.e || ce(t.cat))}</span><div class="mid">${mid}</div><b class="${d ? 'debt' + (st === 'cash' ? ' done' : '') : t.type}">${sign}${fmt(t.amt)}</b>${act}</div>`;
+};
 
 /* ====== Các màn hình ====== */
 function vHome() {
-  const m = mstat(), b = S.budget, raw = b ? m.o / b * 100 : 0, p = Math.min(raw, 100);
+  const m = mstat(), ds = dstat(), b = S.budget, raw = b ? m.o / b * 100 : 0, p = Math.min(raw, 100);
   return `<header><h1>${new Date().toLocaleDateString('vi-VN', {weekday:'long', day:'numeric', month:'long'})}</h1></header>
   <div class="hero"><small>Tổng tiền hiện tại</small><div class="amt" id="bal">${S.hide ? '••••••' : fmt(bal())}</div>
   <button class="eye" onclick="S.hide=!S.hide;save();render()">${ic(S.hide ? 'eye' : 'eyeoff')}</button>
-  <div class="two"><div><small>Thu tháng này</small><b>+${fmt(m.i)}</b></div><div><small>Chi tháng này</small><b>-${fmt(m.o)}</b></div></div></div>
+  <div class="two"><div><small>Thu tháng này</small><b>+${fmt(m.i)}</b></div><div><small>Chi tháng này</small><b>-${fmt(m.o)}</b></div><div class="wide" onclick="F.type='debt';go('hist')"><small>Nợ chưa thu${ds.open.n ? ' · ' + ds.open.n + ' khoản' : ''}</small><b>${fmt(ds.open.s)}</b></div></div></div>
   ${b ? `<div class="card"><div class="bh"><b>Ngân sách tháng</b><span>${fmt(m.o)} / ${fmt(b)}</span></div><div class="bar"><i class="${raw >= 100 ? 'r' : raw >= 80 ? 'o' : ''}" style="width:${p}%"></i></div>${raw >= 100 ? '<small class="red">' + ic('warn') + ' Đã vượt ngân sách tháng!</small>' : raw >= 80 ? `<small>${ic('warn')} Đã dùng ${Math.round(raw)}% ngân sách</small>` : ''}</div>` : ''}
   <div class="sec"><b class="st">${ic('bolt')} Trừ nhanh</b><a onclick="go('quick')">Xem tất cả</a></div>${grid('out', 6)}`;
 }
@@ -196,7 +231,7 @@ function hl() {
 function vHist() {
   return `<header><h1>Lịch sử</h1></header>
   <div class="sw">${ic('search')}<input placeholder="Tìm kiếm…" value="${esc(F.q)}" oninput="F.q=this.value;$('#hl').innerHTML=hl()"></div>
-  <div class="filters"><select onchange="fl('type',this.value)">${opt('', 'Thu & chi', F.type)}${opt('out', 'Chi', F.type)}${opt('in', 'Thu', F.type)}</select>
+  <div class="filters"><select onchange="fl('type',this.value)">${opt('', 'Thu & chi', F.type)}${opt('out', 'Chi', F.type)}${opt('in', 'Thu', F.type)}${opt('debt', 'Nợ', F.type)}</select>
   <select onchange="fl('cat',this.value)">${opt('', 'Mọi danh mục', F.cat)}${S.cats.map(c => opt(c[1], c[1], F.cat)).join('')}</select>
   <select onchange="fl('r',this.value)">${opt('all', 'Tất cả', F.r)}${opt('7', '7 ngày', F.r)}${opt('30', '30 ngày', F.r)}${opt('m', 'Tháng này', F.r)}</select></div>
   <div class="card list" id="hl">${hl()}</div>`;
@@ -204,12 +239,18 @@ function vHist() {
 function vStats() {
   const a = mstat(), b = mstat(1), ent = Object.entries(a.bc).sort((x, y) => y[1] - x[1]), col = ['#0d9488','#f59e0b','#3b82f6','#ef6a4c','#8b5cf6','#ec4899','#64748b'];
   let acc = 0; const grad = ent.map(([, v], i) => { const s = acc / a.o * 100; acc += v; return `${col[i % 7]} ${s}% ${acc / a.o * 100}%`; }).join(',');
-  const days = [...Array(7)].map((_, i) => { const d = Date.now() - (6 - i) * 864e5; return {l:new Date(d).toLocaleDateString('vi-VN', {weekday:'short'}), v:S.tx.filter(t => t.type === 'out' && dkey(t.ts) === dkey(d)).reduce((s, t) => s + t.amt, 0)}; });
+  const now = new Date(), dow = (now.getDay() + 6) % 7, WD = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN']; // tuần bắt đầu từ Thứ 2
+  const days = WD.map((l, i) => { const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow + i).getTime(); return {l, today:i === dow, v:S.tx.filter(t => t.type === 'out' && dkey(t.ts) === dkey(d)).reduce((s, t) => s + t.amt, 0)}; });
   const mx = Math.max(1, ...days.map(d => d.v)), diff = b.o ? Math.round((a.o - b.o) / b.o * 100) : null;
+  const ds = dstat(), dr = (c, l, x) => `<div class="srow"><span><i class="dot" style="background:${c}"></i>${l}</span><b>${fmt(x.s)}</b></div>`;
+  const dcard = `<div class="card"><b>Nợ</b>${S.tx.some(t => t.type === 'debt') ? `<div class="seg3"><i style="flex:${ds.open.s};background:var(--debt)"></i><i style="flex:${ds.cash.s};background:var(--in)"></i><i style="flex:${ds.online.s};background:#3b82f6"></i></div>
+    ${dr('var(--debt)', 'Chưa thu' + (ds.open.n ? ' (' + ds.open.n + ' khoản)' : ''), ds.open)}${dr('var(--in)', 'Đã thu trực tiếp (đã cộng lại)', ds.cash)}${dr('#3b82f6', 'Đã thu online', ds.online)}
+    <small>Cho nợ trong tháng này: ${fmt(a.db)}</small>` : '<p class="empty">Chưa có khoản nợ</p>'}</div>`;
   return `<header><h1>Thống kê</h1></header>
   <div class="card"><small>Chi tháng này</small><div class="big2">${fmt(a.o)}</div><small>Tháng trước: ${fmt(b.o)}${diff === null ? '' : ` · <b class="${diff > 0 ? 'out' : 'in'}">${diff > 0 ? '▲' : '▼'} ${Math.abs(diff)}%</b>`}</small></div>
   <div class="card"><b>Theo danh mục</b>${ent.length ? `<div class="donut" style="background:conic-gradient(${grad})"></div>${ent.map(([k, v], i) => `<div class="srow"><span><i class="dot" style="background:${col[i % 7]}"></i>${ce(k)} ${esc(k)}</span><b>${fmt(v)} · ${Math.round(v / a.o * 100)}%</b></div>`).join('')}` : '<p class="empty">Chưa có chi tiêu tháng này</p>'}</div>
-  <div class="card"><b>Chi 7 ngày gần nhất</b><div class="bars">${days.map(d => `<div title="${fmt(d.v)}"><i style="height:${d.v / mx * 100}%"></i><small>${d.l}</small></div>`).join('')}</div></div>`;
+  <div class="card"><b>Chi tuần này</b> <small>(Thứ 2 → CN)</small><div class="bars">${days.map(d => `<div title="${fmt(d.v)}"><i style="height:${d.v / mx * 100}%"></i><small class="${d.today ? 'td' : ''}">${d.l}</small></div>`).join('')}</div></div>
+  ${dcard}`;
 }
 function vSet() {
   const s = S.set, days = Math.floor((Date.now() - s.bk) / 864e5);
@@ -253,7 +294,7 @@ function dl(name, txt, type) { const a = document.createElement('a'); a.href = U
 function expJ() { S.set.bk = Date.now(); save(); dl('quan-ly-tien-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify(S), 'application/json'); render(); }
 function expC() {
   const q = x => '"' + String(x).replace(/"/g, '""') + '"';
-  dl('giao-dich.csv', '\ufeffNgày,Loại,Số tiền,Danh mục,Tên,Ghi chú\n' + [...S.tx].sort((a, b) => a.ts - b.ts).map(t => [new Date(t.ts).toLocaleString('vi-VN'), t.type === 'in' ? 'Thu' : 'Chi', t.amt, t.cat, t.name || '', t.note || ''].map(q).join(',')).join('\n'), 'text/csv');
+  dl('giao-dich.csv', '\ufeffNgày,Loại,Số tiền,Danh mục,Tên,Ghi chú,Trạng thái nợ\n' + [...S.tx].sort((a, b) => a.ts - b.ts).map(t => [new Date(t.ts).toLocaleString('vi-VN'), ({in:'Thu', out:'Chi', debt:'Nợ'})[t.type], t.amt, t.cat, t.name || '', t.note || '', t.type === 'debt' ? ({cash:'Đã thu trực tiếp', online:'Đã thu online'})[t.st] || 'Chưa thu' : ''].map(q).join(',')).join('\n'), 'text/csv');
 }
 function imp(f) {
   if (!f) return;
