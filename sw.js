@@ -1,5 +1,5 @@
 // Đổi số phiên bản mỗi khi đẩy code mới
-const V = 'qlt-v4';
+const V = 'qlt-v5';
 const A = ['./', './index.html', './style.css', './app.js', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png'];
 
 // Cài đặt: tải sẵn TOÀN BỘ file vào bộ nhớ máy

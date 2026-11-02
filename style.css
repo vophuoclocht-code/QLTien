@@ -99,3 +99,7 @@ input[type=checkbox]{width:24px;height:24px;accent-color:var(--pr)}
 .sw{position:relative;margin-bottom:10px}.sw .ico{position:absolute;left:14px;top:14px;font-size:20px;color:var(--mu)}.sw input{padding-left:44px;margin:0}
 .lk{display:grid;place-items:center;font-size:54px;color:var(--pr);margin-bottom:6px}.lk .ico{stroke-width:1.5}
 .pad .ico{font-size:28px}
+.acts{display:flex;gap:6px;flex:none}
+.mvb{width:34px;height:34px;border-radius:10px;background:var(--bg);display:grid;place-items:center;font-size:18px;color:var(--mu)}
+.mvb:active{background:color-mix(in srgb,var(--pr) 18%,transparent)}.mvb.red{color:#e5484d}
+.srow .lb{min-width:0}

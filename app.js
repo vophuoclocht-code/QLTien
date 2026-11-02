@@ -58,6 +58,9 @@ const ICONS = {
  plus:'<path d="M12 5v14M5 12h14"/>',
  chr:'<path d="m9 6 6 6-6 6"/>',
  chl:'<path d="m15 6-6 6 6 6"/>',
+ chu:'<path d="m6 15 6-6 6 6"/>',
+ chd:'<path d="m6 9 6 6 6-6"/>',
+ top:'<path d="M6 4.5h12M6 16l6-6 6 6"/>',
  search:'<circle class="f" cx="11" cy="11" r="7"/><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
  warn:'<path class="f" d="M12 3.5 21.5 20h-19z"/><path d="M12 3.5 21.5 20h-19zM12 10v4.5M12 17.4h.01"/>',
  edit:'<path class="f" d="m4 20 1-4L16 5l3 3L8 19z"/><path d="m4 20 1-4L16 5l3 3L8 19zM14 7l3 3"/>',
@@ -100,7 +103,7 @@ function qp(id) {                                   // bấm nút trừ/cộng n
   vib(); addTx({type:q.t, amt:q.a, name:q.n, e:q.e, cat:q.k || (q.t === 'in' ? 'Thu nhập' : 'Khác')});
 }
 const sh = h => { $('#sheet').innerHTML = `<div class="bd" onclick="cl()"></div><div class="card sheet">${h}</div>`; $('#sheet').className = 'open'; };
-const cl = () => { $('#sheet').className = ''; };
+const cl = () => { $('#sheet').className = ''; if (view === 'set') render(); };
 function txSheet(t) {
   const e = !!t.id; t = Object.assign({type:'out', amt:0, note:'', ts:Date.now()}, t); if (!t.cat) t.cat = defCat(t.type); _ty = t.type;
   const d = new Date(t.ts - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
@@ -223,12 +226,19 @@ function offCheck() { // kiểm tra app đã được lưu để dùng ngoại t
 }
 function setBal() { const v = prompt('Số dư thực tế hiện tại (đồng):', bal()); if (v === null) return; S.b0 += num(v) - bal(); save(); render(); }
 function setBud() { const v = prompt('Hạn mức chi mỗi tháng (đồng, nhập 0 để tắt):', S.budget); if (v === null) return; S.budget = num(v); save(); render(); }
-function cats() {
-  sh(`<h3>Danh mục</h3>${S.cats.map((c, i) => `<div class="srow"><span>${c[0]} ${esc(c[1])}</span><b class="red" onclick="catDel(${i})">Xóa</b></div>`).join('')}
-  <div class="two2" style="margin-top:12px"><input id="c-e" placeholder="😀" style="width:70px;text-align:center"><input id="c-n" placeholder="Tên danh mục"></div><button class="btn" onclick="catAdd()">Thêm</button>`);
+const catList = () => S.cats.map((c, i) => `<div class="srow"><span class="lb"><i class="si">${esc(c[0])}</i>${esc(c[1])}</span><span class="acts"><b class="mvb" onclick="catMove(${i},-9)">${ic('top')}</b><b class="mvb" onclick="catMove(${i},-1)">${ic('chu')}</b><b class="mvb" onclick="catMove(${i},1)">${ic('chd')}</b><b class="mvb red" onclick="catDel(${i})">${ic('trash')}</b></span></div>`).join('');
+const catRefresh = () => { $('#cl').innerHTML = catList(); };
+function cats() { // quản lý danh mục: thứ tự ở đây = thứ tự trong ô chọn khi thêm giao dịch
+  sh(`<h3>Danh mục</h3><p class="hint">Đưa danh mục hay dùng lên đầu: ${ic('top')} lên đầu, ${ic('chu')} ${ic('chd')} đổi vị trí.</p><div id="cl">${catList()}</div>
+  <div class="two2" style="margin-top:12px"><input id="c-e" placeholder="😀" style="width:70px;text-align:center"><input id="c-n" placeholder="Tên danh mục"></div><button class="btn" onclick="catAdd()">Thêm danh mục</button><button class="btn red" onclick="cl()">Xong</button>`);
 }
-function catAdd() { const n = $('#c-n').value.trim(); if (!n) return; S.cats.push([$('#c-e').value || '🏷️', n]); save(); cats(); }
-function catDel(i) { if (S.cats.length > 1) { S.cats.splice(i, 1); save(); cats(); } }
+function catAdd() { const n = $('#c-n').value.trim(); if (!n) return; S.cats.push([$('#c-e').value || '🏷️', n]); save(); $('#c-n').value = ''; $('#c-e').value = ''; catRefresh(); }
+function catDel(i) { if (S.cats.length > 1) { S.cats.splice(i, 1); save(); catRefresh(); } }
+function catMove(i, d) {
+  if (d === -9) { S.cats.unshift(S.cats.splice(i, 1)[0]); }
+  else { const k = i + d; if (k < 0 || k >= S.cats.length) return; [S.cats[i], S.cats[k]] = [S.cats[k], S.cats[i]]; }
+  save(); catRefresh();
+}
 
 /* ====== Sao lưu / khôi phục ====== */
 function dl(name, txt, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], {type})); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1e3); }
